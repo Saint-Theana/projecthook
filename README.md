@@ -69,3 +69,7 @@ LD_PRELOAD=../lib/libasan.so.5:./libhook.so ./gameserver -i yourappid
   "dailyGachaTimes": 56
 }
 ```
+
+## Thanks </br>
+### [Detour library](https://github.com/8dcc/libdetour)</br>
+### [cpp-httplib](https://github.com/yhirose/cpp-httplib)
