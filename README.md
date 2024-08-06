@@ -1,16 +1,16 @@
-#Project Hook</br>
-##This is a project for hooking a server program of a certain Anime Game called "GayShit Inffect"
+# Project Hook</br>
+## This is a project for hooking a server program of a certain Anime Game called "GayShit Inffect"
 
-##What is this for?</br>
-###Report certain packet to http api in json format.
+## What is this for?</br>
+### Report certain packet to http api in json format.
 
-##How to build?
+## How to build?
 ```shell
 make
 ```
 
-##How to use?</br>
-###configure your config file,save as config.json,put it under same directory as where gameserver is.edit cmd_name_filter with the packet you wish to report.
+## How to use?</br>
+### configure your config file,save as config.json,put it under same directory as where gameserver is.edit cmd_name_filter with the packet you wish to report.
 ```json
 {
   "cmd_name_filter": [
