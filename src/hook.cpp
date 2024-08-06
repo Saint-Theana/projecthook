@@ -164,7 +164,7 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
         fprintf(stdout, "api_path: %s. \n" , get_api_server().c_str());
         
         httplib::Client cli(get_api_server());
-        httplib::Result res = cli.Post(str_format("%s?region=%s&uid=%d",get_api_path().c_str(),region_name.c_str(),uid),bodystr, "text/plain");
+        httplib::Result res = cli.Post(str_format("%s?region=%s&uid=%d&cmd_name=%s",get_api_path().c_str(),region_name.c_str(),uid,cmd_name.c_str()),bodystr, "text/plain");
         
     } 
     

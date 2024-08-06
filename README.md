@@ -26,11 +26,10 @@ LD_PRELOAD=../lib/libasan.so.5:./libhook.so ./gameserver -i yourappid
 ```
  
 ## tested on 3.2
-
-## it reports proto message in json format with region name and uid.
+## it reports proto message in json format with region name and uid & cmd_name.
 ## report example:
 ```text
-::ffff:127.0.0.1 - - [07/Aug/2024 00:00:23] "POST /packet_report?region=dev_gio_32&uid=1000 HTTP/1.1" 200 -
+::ffff:127.0.0.1 - - [07/Aug/2024 00:00:23] "POST /packet_report?region=dev_gio_32&uid=1000&cmd_name=DoGachaRsp HTTP/1.1" 200 -
 ```
 ```json
 {
