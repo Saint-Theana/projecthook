@@ -21,8 +21,14 @@ make
 }
 ```
 ```shell
-#to be idiotic,libasan.so must be first to load,and than it is our beloved little trick.
-LD_PRELOAD=../lib/libasan.so.5:./libhook.so ./gameserver -i yourappid
+#mkdir -p patch/lib
+#echo 1162732_test.so > patch/installed
+#copy 1162732_test.so to patch/lib/1162732_test.so
+├── gameserver
+└── patch
+    ├── installed
+    └── lib
+        └── 1162732_test.so
 ```
  
 ## tested on 3.2
@@ -70,6 +76,6 @@ LD_PRELOAD=../lib/libasan.so.5:./libhook.so ./gameserver -i yourappid
 }
 ```
 
-## Thanks </br>
-### [Detour library](https://github.com/8dcc/libdetour)</br>
+## Thanks: </br>
+### Hotaru for tips of how to use internal hot_patch and internal milog api.
 ### [cpp-httplib](https://github.com/yhirose/cpp-httplib)

@@ -1,6 +1,6 @@
 CC := g++
 # Compiler flags
-CFLAGS := -Wall -fPIC -std=c++20
+CFLAGS := -Wall -fPIC -std=c++20 -Iinclude
 
 # Directories
 SRCDIR := src
