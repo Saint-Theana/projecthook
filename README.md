@@ -23,7 +23,7 @@ make
 ```shell
 #mkdir -p patch/lib
 #echo 1162732_test.so > patch/installed
-#copy 1162732_test.so to patch/lib/1162732_test.so
+#cp <where_your_so_file_was_located>/1162732_test.so patch/lib/1162732_test.so
 ├── gameserver
 └── patch
     ├── installed
