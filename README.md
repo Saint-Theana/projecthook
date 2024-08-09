@@ -83,4 +83,4 @@ make
 ### [zydis](https://github.com/zyantific/zydis): disassembler library.</br>
 
 ##Virus alike files lib/libxxx.a:</br>
-##those files was prebuilt libraries that project uses,if you dont trust this repo,compile then yourself.
+##those files was prebuilt libraries that project uses,if you dont trust this repo,compile them yourself.
