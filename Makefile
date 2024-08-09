@@ -25,7 +25,7 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
 # Rule to build shared library
 $(LIBDIR)/$(LIBNAME): $(OBJS)
 	@mkdir -p $(LIBDIR)
-	$(CC) -shared  -fPIC -o $@ $^ -Llib -ldl -ljsoncpp -lcapstone -lZydis 
+	$(CC) -shared  -fPIC -o $@ $^ -Llib -ldl -ljsoncpp -lZydis 
 
 # Clean command
 clean:

@@ -7,7 +7,6 @@
 #include "common/milog.h"
 #include "common/minet.h"
 #include <dlfcn.h>
-#include "capstone/capstone.h"
 #include "google/protobuf/util/json_util.h"
 #include "json/json.h"
 #include <iostream>
@@ -33,92 +32,6 @@
 #define CODE_WRITE				PROT_READ | PROT_WRITE | PROT_EXEC
 #define CODE_READ_ONLY			PROT_READ | PROT_EXEC
 
-
-void  *tempAddr = (void  *)0x2a52000;
-
-
-int get_asm_len(intptr_t target)
-{
-    csh handle;
-    cs_insn* insn;
-    size_t count;
-    uint8_t code[30] = {0};
-    int rv;
- 
-    memcpy((void*)code, (void*)target, 30);
-    if(cs_open(CS_ARCH_X86, CS_MODE_64, &handle))
-    {
-        printf("Error: cs_open\n");
-        return -1;
-    }
- 
-    count = cs_disasm(handle, code, 30, 0, 0, &insn);
-    if(count)
-    {
-        for(size_t i = 0; i < count; i++)
-        {
-            if (insn[i].address >= 12)
-            {
-                rv = insn[i].address;
-                break;
-            }
-        }
-        cs_free(insn, count);
-    }
-    else
-    {
-        printf("Error: cs_disasm\n");
-        return -1;
-    }
-    cs_close(&handle);
-    return rv;
-}
-
-
-void make_phony_function(void **function,void *target_function){
-    intptr_t target_addr=(intptr_t)target_function;
-    intptr_t page_start = target_addr & 0xfffffffff000;
-    mprotect((void*)page_start, 0x1000, PROT_READ|PROT_EXEC);
-    int asm_len = get_asm_len(target_addr);
-    
-    std::cout<<asm_len<<std::endl;
-    if(asm_len <= 0)
-    {
-        std::cout<<"Error: get_asm_len\n"<<std::endl;
-    }
-    char* temp_func = (char*)mmap(tempAddr, 4096, PROT_WRITE|PROT_EXEC|PROT_READ, MAP_ANON|MAP_PRIVATE, -1, 0);
-
-    
-    memcpy((void*)temp_func, (void*)target_addr, asm_len);
-    intptr_t y = (intptr_t)target_addr + asm_len;
-    //构造push&ret跳转，填入目标地址
-    /*char jmp_code[14] = {0x68,y&0xff,(y&0xff00)>>8,(y&0xff0000)>>16,(y&0xff000000)>>24,
-        0xC7,0x44,0x24,0x04,(y&0xff00000000)>>32,(y&0xff0000000000)>>40,(y&0xff000000000000)>>48,
-        (y&0xff00000000000000)>>56,0xC3};
-    
-    memcpy((void*)(temp_func+asm_len), (void*)jmp_code, 14);
-    */
-    
-    fprintf(stderr, "temp_func 0x%llx\n",temp_func);
-    
-    fprintf(stderr, "target_addr 0x%llx\n",target_addr);
-    
-    
-    uint32_t relativeAddr = y - ((intptr_t)temp_func+asm_len+5);
-    fprintf(stderr, "relativeAddr 0x%llx\n",relativeAddr);
-    
-    uint8_t jmp_code[5] = {0xe9,0x00,0x00,0x00,0x00};
-    memcpy(jmp_code + 1, &relativeAddr, sizeof(uint32_t));
-    
-    memcpy((void*)(temp_func+asm_len), (void*)jmp_code, 5);
-    
-    mprotect((void*)page_start, 0x1000, PROT_READ | PROT_EXEC);
-    *function = (void*)temp_func;
-    
-
-
-
-}
 std::string region_name="";
 
 std::list<std::string>& getCmdNameFilterList() {
@@ -302,42 +215,6 @@ GameserverService * findServiceE(){
     std::cout<<"SS"<<std::endl;
     return nullptr;
 }
-
-#include <iostream>
-#include <capstone/capstone.h>
-
-
-
-
-void disassembleFunction(void* func, size_t size) {
-    csh handle;
-    cs_insn* insn;
-    size_t count;
-
-    // 初始化 Capstone 反汇编器
-    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
-        std::cerr << "Failed to initialize Capstone" << std::endl;
-        return;
-    }
-
-    // 反汇编函数的机器代码
-    count = cs_disasm(handle, (uint8_t*)func, size, (uint64_t)func, 0, &insn);
-    if (count > 0) {
-        for (size_t i = 0; i < count; i++) {
-            std::cout << "0x" << std::hex << insn[i].address << ":\t"
-                      << insn[i].mnemonic << "\t"
-                      << insn[i].op_str << std::endl;
-        }
-
-        // 释放 Capstone 使用的内存
-        cs_free(insn, count);
-    } else {
-        std::cerr << "Failed to disassemble function" << std::endl;
-    }
-
-    cs_close(&handle);
-}
-
 
 extern "C" std::map<std::string,std::string> getFuncMap() {
    std::map<std::string,std::string> hookFuncMap ={
