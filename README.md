@@ -77,8 +77,10 @@ make
 ```
 
 ## Thanks: </br>
-### Hotaru for tips of how to use internal hot_patch and internal milog api.
-### [cpp-httplib](https://github.com/yhirose/cpp-httplib)
+### Hotaru for tips of how to use internal hot_patch and internal milog api.</br>
+### [cpp-httplib](https://github.com/yhirose/cpp-httplib): http library.</br>
+### [PFishHook](https://github.com/Menooker/PFishHook): hook library.</br>
+### [zydis](https://github.com/zyantific/zydis): disassembler library.</br>
 
-##Virus alike file lib/libjsoncpp.a:</br>
-##this file is the only binary library file used,if you dont trust this repo,compile jsoncpp yourself.
+##Virus alike files lib/libxxx.a:</br>
+##those files was prebuilt libraries that project uses,if you dont trust this repo,compile then yourself.

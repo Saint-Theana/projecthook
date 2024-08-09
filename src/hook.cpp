@@ -7,6 +7,7 @@
 #include "common/milog.h"
 #include "common/minet.h"
 #include <dlfcn.h>
+#include "capstone/capstone.h"
 #include "google/protobuf/util/json_util.h"
 #include "json/json.h"
 #include <iostream>
@@ -17,31 +18,107 @@
 #include <unistd.h>   // For readlink()
 #include <list>
 #include "httplib.h"
-
+#include "app-types.h"
+#include "PFishHook.h"
+#include "Zydis/Zydis.h"
 #define __int64 long long
 
-typedef std::string *(*getCmdName_ptr)(uint32_t);
 
-getCmdName_ptr getCmdName;
+#define STORE_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) RETURN_T (*NAME) PARAMS
+#define DO_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) RETURN_T (*NAME) PARAMS
+#include "functions.h"
+#undef DO_APP_FUNC
+#undef STORE_APP_FUNC
+#define PAGE_START(x,pagesize)	((x) &~ ((pagesize) - 1))
+#define CODE_WRITE				PROT_READ | PROT_WRITE | PROT_EXEC
+#define CODE_READ_ONLY			PROT_READ | PROT_EXEC
 
-struct GameserverService;
-struct Config;
-typedef GameserverService *(*findService_ptr)();
 
-findService_ptr findService;
+void  *tempAddr = (void  *)0x2a52000;
 
-typedef std::shared_ptr<Config> (*getConfig_ptr)(GameserverService *);
 
-getConfig_ptr getConfig;
+int get_asm_len(intptr_t target)
+{
+    csh handle;
+    cs_insn* insn;
+    size_t count;
+    uint8_t code[30] = {0};
+    int rv;
+ 
+    memcpy((void*)code, (void*)target, 30);
+    if(cs_open(CS_ARCH_X86, CS_MODE_64, &handle))
+    {
+        printf("Error: cs_open\n");
+        return -1;
+    }
+ 
+    count = cs_disasm(handle, code, 30, 0, 0, &insn);
+    if(count)
+    {
+        for(size_t i = 0; i < count; i++)
+        {
+            if (insn[i].address >= 12)
+            {
+                rv = insn[i].address;
+                break;
+            }
+        }
+        cs_free(insn, count);
+    }
+    else
+    {
+        printf("Error: cs_disasm\n");
+        return -1;
+    }
+    cs_close(&handle);
+    return rv;
+}
 
-typedef std::string *(*getRegionName_ptr)(Config *);
 
-getRegionName_ptr getRegionName;
+void make_phony_function(void **function,void *target_function){
+    intptr_t target_addr=(intptr_t)target_function;
+    intptr_t page_start = target_addr & 0xfffffffff000;
+    mprotect((void*)page_start, 0x1000, PROT_READ|PROT_EXEC);
+    int asm_len = get_asm_len(target_addr);
+    
+    std::cout<<asm_len<<std::endl;
+    if(asm_len <= 0)
+    {
+        std::cout<<"Error: get_asm_len\n"<<std::endl;
+    }
+    char* temp_func = (char*)mmap(tempAddr, 4096, PROT_WRITE|PROT_EXEC|PROT_READ, MAP_ANON|MAP_PRIVATE, -1, 0);
 
-typedef std::string *(*getProtoDebugString_ptr)(std::string *,common::minet::Packet *);
+    
+    memcpy((void*)temp_func, (void*)target_addr, asm_len);
+    intptr_t y = (intptr_t)target_addr + asm_len;
+    //构造push&ret跳转，填入目标地址
+    /*char jmp_code[14] = {0x68,y&0xff,(y&0xff00)>>8,(y&0xff0000)>>16,(y&0xff000000)>>24,
+        0xC7,0x44,0x24,0x04,(y&0xff00000000)>>32,(y&0xff0000000000)>>40,(y&0xff000000000000)>>48,
+        (y&0xff00000000000000)>>56,0xC3};
+    
+    memcpy((void*)(temp_func+asm_len), (void*)jmp_code, 14);
+    */
+    
+    fprintf(stderr, "temp_func 0x%llx\n",temp_func);
+    
+    fprintf(stderr, "target_addr 0x%llx\n",target_addr);
+    
+    
+    uint32_t relativeAddr = y - ((intptr_t)temp_func+asm_len+5);
+    fprintf(stderr, "relativeAddr 0x%llx\n",relativeAddr);
+    
+    uint8_t jmp_code[5] = {0xe9,0x00,0x00,0x00,0x00};
+    memcpy(jmp_code + 1, &relativeAddr, sizeof(uint32_t));
+    
+    memcpy((void*)(temp_func+asm_len), (void*)jmp_code, 5);
+    
+    mprotect((void*)page_start, 0x1000, PROT_READ | PROT_EXEC);
+    *function = (void*)temp_func;
+    
 
-getProtoDebugString_ptr getProtoDebugString;
 
+
+}
 std::string region_name="";
 
 std::list<std::string>& getCmdNameFilterList() {
@@ -57,6 +134,13 @@ std::string& get_api_server() {
 std::string& get_api_path() {
     static std::string api_path = "initial_value";
     return api_path;
+}
+
+std::string *getRegionName_Fake(Config *config){
+    INFO("getRegionName_Fake \n");
+    std::string *name= getRegionNameEX(config);
+    INFO("getRegionName_Fake result %s\n",(*name).c_str());
+    return name;
 }
 
 
@@ -124,9 +208,6 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
         httplib::Result res = cli.Post(str_format("%s?region=%s&uid=%d&cmd_name=%s",get_api_path().c_str(),region_name.c_str(),uid,cmd_name.c_str()),bodystr, "text/plain");
         
     } 
-    
-    
-    
     return 0;
 }
 
@@ -192,19 +273,74 @@ __attribute__((constructor)) void setup_hook() {
         cmd_name_filter_list.push_back(node["cmd_name_filter"][i].asString());
     }
     void *handle = dlopen(NULL, RTLD_NOW);
-    getCmdName=(getCmdName_ptr) dlsym(handle, "_ZN10ProtoUtils10getCmdNameB5cxx11Ej");
-    getRegionName=(getRegionName_ptr) dlsym(handle, "_ZN10ConfigBase13getRegionNameB5cxx11Ev");
-    findService=(findService_ptr) dlsym(handle, "_ZN10ServiceBox11findServiceI17GameserverServiceEEPT_v");
-    getConfig=(getConfig_ptr) dlsym(handle, "_ZN17GameserverService9getConfigEv");
-    getProtoDebugString=(getProtoDebugString_ptr) dlsym(handle, "_ZNK6common5minet6Packet19getProtoDebugStringB5cxx11Ev");
+    
+    #define DO_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) NAME = (RETURN_T (*) PARAMS) dlsym(handle, OFFSET);
+    #define STORE_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) 
+    #include "functions.h"
+    #undef DO_APP_FUNC
+    #undef STORE_APP_FUNC
+    
+    #define DO_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) 
+    #define STORE_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) FakeIt(dlsym(handle, OFFSET),(void**)&NAME);
+    #include "functions.h"
+    #undef DO_APP_FUNC
+    #undef STORE_APP_FUNC
+    
+    
+    GameserverService *service =findService();
+    Config *config=getConfig(service).get();
     INFO("Hook done!\n");
 }
 
 
 // ---
 
+GameserverService * findServiceE(){
+    std::cout<<"AA"<<std::endl;
+    std::cout<<"BB"<<std::endl;
+    std::cout<<"DD"<<std::endl;
+    std::cout<<"SS"<<std::endl;
+    return nullptr;
+}
+
+#include <iostream>
+#include <capstone/capstone.h>
+
+
+
+
+void disassembleFunction(void* func, size_t size) {
+    csh handle;
+    cs_insn* insn;
+    size_t count;
+
+    // 初始化 Capstone 反汇编器
+    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK) {
+        std::cerr << "Failed to initialize Capstone" << std::endl;
+        return;
+    }
+
+    // 反汇编函数的机器代码
+    count = cs_disasm(handle, (uint8_t*)func, size, (uint64_t)func, 0, &insn);
+    if (count > 0) {
+        for (size_t i = 0; i < count; i++) {
+            std::cout << "0x" << std::hex << insn[i].address << ":\t"
+                      << insn[i].mnemonic << "\t"
+                      << insn[i].op_str << std::endl;
+        }
+
+        // 释放 Capstone 使用的内存
+        cs_free(insn, count);
+    } else {
+        std::cerr << "Failed to disassemble function" << std::endl;
+    }
+
+    cs_close(&handle);
+}
+
+
 extern "C" std::map<std::string,std::string> getFuncMap() {
-  return std::map<std::string,std::string> {
+   std::map<std::string,std::string> hookFuncMap ={
     {
       "_ZN10ProtoUtils21convertPacketToStringESt10shared_ptrIN6common5minet6PacketEERNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE",
       "_Z26convertPacketToString_FakeSt10shared_ptrIN6common5minet6PacketEEPNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE"
@@ -212,8 +348,13 @@ extern "C" std::map<std::string,std::string> getFuncMap() {
     {
       "_ZNK6google8protobuf7Message11DebugStringB5cxx11Ev",
       "_Z16DebugString_FakePNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEPN6google8protobuf7MessageE"
-    }
+    }/*,
+    {
+      "_ZN10ConfigBase13getRegionNameB5cxx11Ev",
+      "_Z18getRegionName_FakeB5cxx11P6Config"
+    }*/
   };
+  return hookFuncMap;
 }
 
 // ---

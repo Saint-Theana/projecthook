@@ -1,6 +1,6 @@
 CC := g++
 # Compiler flags
-CFLAGS := -Wall -fPIC -std=c++20 -Iinclude
+CFLAGS := -Wall -Wno-narrowing -fPIC -std=c++20 -Iinclude 
 
 # Directories
 SRCDIR := src
@@ -25,7 +25,7 @@ $(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
 # Rule to build shared library
 $(LIBDIR)/$(LIBNAME): $(OBJS)
 	@mkdir -p $(LIBDIR)
-	$(CC) -shared -o $@ $^ -Llib -ljsoncpp
+	$(CC) -shared  -fPIC -o $@ $^ -Llib -ldl -ljsoncpp -lcapstone -lZydis 
 
 # Clean command
 clean:
