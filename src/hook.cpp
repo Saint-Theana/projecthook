@@ -28,9 +28,6 @@
 #include "functions.h"
 #undef DO_APP_FUNC
 #undef STORE_APP_FUNC
-#define PAGE_START(x,pagesize)	((x) &~ ((pagesize) - 1))
-#define CODE_WRITE				PROT_READ | PROT_WRITE | PROT_EXEC
-#define CODE_READ_ONLY			PROT_READ | PROT_EXEC
 
 std::string region_name="";
 
@@ -113,13 +110,9 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
     auto it = std::find(cmd_name_filter_list.begin(), cmd_name_filter_list.end(), cmd_name);
 
     if (it != cmd_name_filter_list.end()) {
-        INFO("cmd: %s. found in cmd_name_filter_list\n" , cmd_name.c_str());
-        INFO("api_path: %s. \n" , get_api_path().c_str());
-        INFO("api_path: %s. \n" , get_api_server().c_str());
-        
+        INFO("cmd: %s. found in cmd_name_filter_list,reporting\n" , cmd_name.c_str());
         httplib::Client cli(get_api_server());
         httplib::Result res = cli.Post(str_format("%s?region=%s&uid=%d&cmd_name=%s",get_api_path().c_str(),region_name.c_str(),uid,cmd_name.c_str()),bodystr, "text/plain");
-        
     } 
     return 0;
 }
@@ -140,7 +133,6 @@ std::string readFile(const std::string& filePath) {
         fprintf(stderr, "Failed to open file: %s\n", filePath.c_str());
         return "";
     }
-
     std::stringstream buffer;
     buffer << file.rdbuf();
     return buffer.str();
@@ -165,24 +157,19 @@ __attribute__((constructor)) void setup_hook() {
         return;
     }
 
-    INFO("File content: %s. \n" , fileContent.c_str());
-
+    INFO("read config succ,content : %s. \n" , fileContent.c_str());
     Json::Value node;
     Json::Reader reader;
-    
     reader.parse(fileContent, node);
-    
     get_api_server()=node["api_server"].asString();
     get_api_path()=node["api_path"].asString();
-    
-    
+
     int size=node["cmd_name_filter"].size();
     
     std::list<std::string>& cmd_name_filter_list = getCmdNameFilterList();
   
     for(int i = 0; i < size; i++)
     {
-        //fprintf(stdout,"%s \n",node["cmd_name_filter"][i].asString().c_str());
         cmd_name_filter_list.push_back(node["cmd_name_filter"][i].asString());
     }
     void *handle = dlopen(NULL, RTLD_NOW);
@@ -199,28 +186,17 @@ __attribute__((constructor)) void setup_hook() {
     #undef DO_APP_FUNC
     #undef STORE_APP_FUNC
     
-    
-    GameserverService *service =findService();
-    Config *config=getConfig(service).get();
     INFO("Hook done!\n");
 }
 
 
 // ---
-
-GameserverService * findServiceE(){
-    std::cout<<"AA"<<std::endl;
-    std::cout<<"BB"<<std::endl;
-    std::cout<<"DD"<<std::endl;
-    std::cout<<"SS"<<std::endl;
-    return nullptr;
-}
-
 extern "C" std::map<std::string,std::string> getFuncMap() {
    std::map<std::string,std::string> hookFuncMap ={
     {
       "_ZN10ProtoUtils21convertPacketToStringESt10shared_ptrIN6common5minet6PacketEERNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE",
       "_Z26convertPacketToString_FakeSt10shared_ptrIN6common5minet6PacketEEPNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE"
+    
     },
     {
       "_ZNK6google8protobuf7Message11DebugStringB5cxx11Ev",
