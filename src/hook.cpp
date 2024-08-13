@@ -46,21 +46,6 @@ std::string& get_api_path() {
     return api_path;
 }
 
-std::string *getRegionName_Fake(Config *config){
-    INFO("getRegionName_Fake \n");
-    std::string *name= getRegionNameEX(config);
-    INFO("getRegionName_Fake result %s\n",(*name).c_str());
-    return name;
-}
-
-
-std::string *DebugString_Fake(std::string *retstr,google::protobuf::Message *message){
-    google::protobuf::util::JsonPrintOptions options;
-    options.add_whitespace = true; // 设置为 true 启用缩进
-    google::protobuf::util::MessageToJsonString(*message,retstr,options);
-    return retstr;
-}
-
 __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet_ptr, std::string *name){
     
     (*name).clear();
@@ -73,16 +58,18 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
     }
     
     common::minet::Packet *packet = packet_ptr.get();
-    
     google::protobuf::util::JsonPrintOptions options;
     options.add_whitespace = true; // 设置为 true 启用缩进
     
-    std::string headstr="";
+    
     proto::PacketHead& head=packet->head_;
-    google::protobuf::util::MessageToJsonString(head,&headstr,options);
     
     std::string bodystr="";
-    getProtoDebugString(&bodystr,packet);
+    uint16_t las;
+    getProto(&las,packet);
+    std::shared_ptr<google::protobuf::Message> *message_ptr=(std::shared_ptr<google::protobuf::Message>*)&las;
+    google::protobuf::Message *message=message_ptr->get();
+    google::protobuf::util::MessageToJsonString(*message,&bodystr,options);
     
     std::string cmd_name = *getCmdName(packet->cmd_id);
     unsigned int uid =packet->head_.user_id();
@@ -90,21 +77,7 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
     unsigned int packet_id=packet->head_.packet_id();
     unsigned int rpc_id=packet->head_.rpc_id();
     unsigned int sent_ms=packet->head_.sent_ms();
-    
-    std::string packet_info= str_format(
-        "uid:%u, cmd_id:%u, cmd_name:%s, packet_id:%u, rpc_id:%u, client_sequence_id:%lu sent_ms:%lu",
-        uid,
-        packet->cmd_id,
-        cmd_name.c_str(),
-        packet_id,
-        rpc_id,
-        client_sequence_id,
-        sent_ms
-    );
-    
-    std::string finalstr=packet_info+"\nHEAD: "+headstr+"\nBODY: "+bodystr+"\n";
-    
-    (*name).append(finalstr);
+   
     std::list<std::string>& cmd_name_filter_list = getCmdNameFilterList();
   
     auto it = std::find(cmd_name_filter_list.begin(), cmd_name_filter_list.end(), cmd_name);
@@ -114,7 +87,9 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
         httplib::Client cli(get_api_server());
         httplib::Result res = cli.Post(str_format("%s?region=%s&uid=%d&cmd_name=%s",get_api_path().c_str(),region_name.c_str(),uid,cmd_name.c_str()),bodystr, "text/plain");
     } 
-    return 0;
+    
+    
+    return convertPacketToString(packet_ptr,name);
 }
 
 std::string getCurrentDirPath() {
@@ -175,12 +150,6 @@ __attribute__((constructor)) void setup_hook() {
     void *handle = dlopen(NULL, RTLD_NOW);
     
     #define DO_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) NAME = (RETURN_T (*) PARAMS) dlsym(handle, OFFSET);
-    #define STORE_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) 
-    #include "functions.h"
-    #undef DO_APP_FUNC
-    #undef STORE_APP_FUNC
-    
-    #define DO_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) 
     #define STORE_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) FakeIt(dlsym(handle, OFFSET),(void**)&NAME);
     #include "functions.h"
     #undef DO_APP_FUNC
@@ -197,15 +166,7 @@ extern "C" std::map<std::string,std::string> getFuncMap() {
       "_ZN10ProtoUtils21convertPacketToStringESt10shared_ptrIN6common5minet6PacketEERNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE",
       "_Z26convertPacketToString_FakeSt10shared_ptrIN6common5minet6PacketEEPNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE"
     
-    },
-    {
-      "_ZNK6google8protobuf7Message11DebugStringB5cxx11Ev",
-      "_Z16DebugString_FakePNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEPN6google8protobuf7MessageE"
-    }/*,
-    {
-      "_ZN10ConfigBase13getRegionNameB5cxx11Ev",
-      "_Z18getRegionName_FakeB5cxx11P6Config"
-    }*/
+    }
   };
   return hookFuncMap;
 }
