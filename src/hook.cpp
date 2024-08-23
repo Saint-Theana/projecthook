@@ -8,7 +8,7 @@
 #include "common/minet.h"
 #include <dlfcn.h>
 #include "google/protobuf/util/json_util.h"
-#include "json/json.h"
+#include "json.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -17,6 +17,7 @@
 #include <unistd.h>   // For readlink()
 #include <list>
 #include "httplib.h"
+#include "pb2json.h"
 #include "app-types.h"
 #include "PFishHook.h"
 #include "Zydis/Zydis.h"
@@ -64,12 +65,14 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
     
     proto::PacketHead& head=packet->head_;
     
-    std::string bodystr="";
     uint16_t las;
     getProto(&las,packet);
     std::shared_ptr<google::protobuf::Message> *message_ptr=(std::shared_ptr<google::protobuf::Message>*)&las;
     google::protobuf::Message *message=message_ptr->get();
-    google::protobuf::util::MessageToJsonString(*message,&bodystr,options);
+    nlohmann::json json;
+    
+    Pb2Json::Message2Json(*message,json,true);
+    std::string bodystr=json.dump();
     
     std::string cmd_name = *getCmdName(packet->cmd_id);
     unsigned int uid =packet->head_.user_id();
@@ -133,20 +136,26 @@ __attribute__((constructor)) void setup_hook() {
     }
 
     INFO("read config succ,content : %s. \n" , fileContent.c_str());
-    Json::Value node;
-    Json::Reader reader;
-    reader.parse(fileContent, node);
-    get_api_server()=node["api_server"].asString();
-    get_api_path()=node["api_path"].asString();
+    nlohmann::json json;
+    std::ifstream i(filePath);
+    i>>json;
+    
+    
+    
+    get_api_server()=json["api_server"].get<std::string>();
+    get_api_path()=json["api_path"].get<std::string>();
 
-    int size=node["cmd_name_filter"].size();
+    int size=json["cmd_name_filter"].size();
+    
+    INFO("read config succ,content : %d. ",size);
     
     std::list<std::string>& cmd_name_filter_list = getCmdNameFilterList();
   
     for(int i = 0; i < size; i++)
     {
-        cmd_name_filter_list.push_back(node["cmd_name_filter"][i].asString());
+        cmd_name_filter_list.push_back(json["cmd_name_filter"][i].get<std::string>());
     }
+    
     void *handle = dlopen(NULL, RTLD_NOW);
     
     #define DO_APP_FUNC(OFFSET, RETURN_T, NAME, PARAMS) NAME = (RETURN_T (*) PARAMS) dlsym(handle, OFFSET);
