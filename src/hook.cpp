@@ -65,19 +65,20 @@ __int64 convertPacketToString_Fake(std::shared_ptr<common::minet::Packet> packet
     auto it = std::find(cmd_name_filter_list.begin(), cmd_name_filter_list.end(), cmd_name);
 
     if (it != cmd_name_filter_list.end()) {
-        
+        proto::PacketHead& head=packet->head_;
         uint16_t las;
         getProto(&las,packet);
         std::shared_ptr<google::protobuf::Message> *message_ptr=(std::shared_ptr<google::protobuf::Message>*)&las;
         google::protobuf::Message *message=message_ptr->get();
         nlohmann::json json;
-        unsigned int uid =packet->head_.user_id();
+        unsigned int uid =head.user_id();
         Pb2Json::Message2Json(*message,json,true);
         std::string bodystr=json.dump();
-        message_ptr->reset();
-        INFO("cmd: %s. found in cmd_name_filter_list,reporting\n" , cmd_name.c_str());
+        
+        INFO("uid: %d,cmd: %s. found in cmd_name_filter_list,reporting\n" ,uid, cmd_name.c_str());
         httplib::Client cli(get_api_server());
         httplib::Result res = cli.Post(str_format("%s?region=%s&uid=%d&cmd_name=%s",get_api_path().c_str(),region_name.c_str(),uid,cmd_name.c_str()),bodystr, "text/plain");
+        message_ptr->reset();
     } 
 
     return convertPacketToString(packet_ptr,name);
