@@ -4,7 +4,7 @@ DO_APP_FUNC("_ZN10ConfigBase13getRegionNameB5cxx11Ev", std::string * , getRegion
 DO_APP_FUNC("_ZN10ServiceBox11findServiceI17GameserverServiceEEPT_v",GameserverService *,findService,());
 DO_APP_FUNC("_ZN17GameserverService9getConfigEv",std::shared_ptr<Config>,getConfig,(GameserverService *service));
 DO_APP_FUNC("_ZNK6common5minet6Packet19getProtoDebugStringB5cxx11Ev",std::string *,getProtoDebugString,(std::string *out,common::minet::Packet *packet));
-DO_APP_FUNC("_ZN6common5minet6Packet8getProtoEv",google::protobuf::Message *,getProto,(uint16_t *cmd_id,common::minet::Packet *packet));
+DO_APP_FUNC("_ZN6common5minet6Packet8getProtoEv",google::protobuf::Message *,getProto,(std::shared_ptr<google::protobuf::Message> *cmd_id,common::minet::Packet *packet));
 
 //将函数保存在别的位置，通过跳转来调用被hook的函数
 STORE_APP_FUNC("_ZN10ProtoUtils21convertPacketToStringESt10shared_ptrIN6common5minet6PacketEERNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE",__int64,convertPacketToString,(std::shared_ptr<common::minet::Packet> packet_ptr, std::string *name));
